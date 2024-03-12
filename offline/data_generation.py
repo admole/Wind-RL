@@ -21,8 +21,6 @@ def generate_replay_buffer(
 
 
 if __name__ == '__main__':
-    device = 'cpu'
-    total_buffer_size = 10000  # total number of transitions captured
 
     rb = generate_replay_buffer(
         total_buffer_size=10000,
@@ -33,7 +31,7 @@ if __name__ == '__main__':
     filepath = os.getcwd() + '/testing/buffer_test'
     rb.dumps(filepath)
 
-    load_storage = LazyMemmapStorage(total_buffer_size, device=device)
+    load_storage = LazyMemmapStorage(10000, device='cpu')
     rb_load = TensorDictReplayBuffer(storage=load_storage)
     rb_load.loads(filepath)
 
