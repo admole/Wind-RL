@@ -23,6 +23,10 @@ from torchrl.envs.transforms.transforms import _apply_to_composite
 from torchrl.envs.utils import check_env_specs, step_mdp
 
 
+# We should consider switiching this to a Gym environment and then
+# building the torchrl env from that using pre-built functionality
+
+
 class TurbEnv(EnvBase):
     metadata = {}
     batch_locked = False
@@ -30,7 +34,8 @@ class TurbEnv(EnvBase):
     def __init__(self,
                  params=None,
                  seed=None,
-                 device="cpu"):
+                 device="cpu",
+                 dummy_update=False):
         if params is None:
             params = self.gen_params().to(device)
 
@@ -48,11 +53,16 @@ class TurbEnv(EnvBase):
         self.farm1.grid(staggered=False)
         self.adm = ADM(self.farm1)
         self.adm.total_timesteps = 100000
-        self.adm.run_precursor()
-        self.adm.initialise_flow(5000)
-        self.adm.restart()
 
-        self.dummy_update = False  # If True, perform a dummy update for testing
+        self.dummy_update = dummy_update  # If True, perform a dummy update for testing
+
+        if self.dummy_update:
+            print("Using environment with dummy updates. This is to run on machines where xcompact3d is not installed.")
+
+        if not self.dummy_update:
+            self.adm.run_precursor()
+            self.adm.initialise_flow(5000)
+            self.adm.restart()
 
     def _step(self, tensordict):
         alpha = tensordict["alpha"]
@@ -95,7 +105,8 @@ class TurbEnv(EnvBase):
     def _reset(self, tensordict):
         print('\n\nRESETTING ENVIROMENT\n')
 
-        self.adm.restart()
+        if not self.dummy_update:
+            self.adm.restart()
 
         if tensordict is None or tensordict.is_empty():
             # if no tensordict is passed, we generate a single set of hyperparameters
