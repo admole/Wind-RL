@@ -36,6 +36,8 @@ def main(cfg: "DictConfig"):
     print(f'Running on {device}')
     print(f'cuda version:{torch.version.cuda}')
 
+    dummy_update = bool(cfg.env.dummy_update)
+
     # Correct for frame_skip
     frame_skip = cfg.collector.frame_skip
     total_frames = cfg.collector.total_frames // frame_skip
@@ -50,7 +52,7 @@ def main(cfg: "DictConfig"):
 
     # Create collector
     collector = SyncDataCollector(
-        create_env_fn=make_env(device),
+        create_env_fn=make_env(device, dummy_update=dummy_update),
         policy=actor,
         frames_per_batch=frames_per_batch,
         total_frames=total_frames,
@@ -101,7 +103,7 @@ def main(cfg: "DictConfig"):
     )
 
     # Create test environment
-    test_env = make_env(device)
+    test_env = make_env(device, dummy_update=dummy_update)
     test_env.eval()
 
     # Main loop

@@ -1,6 +1,7 @@
 # task and env
 env:
   env_name: WindFarm
+  dummy_update: True
 
 # collector
 collector:
