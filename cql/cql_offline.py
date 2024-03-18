@@ -38,7 +38,7 @@ from utils import (
 )
 
 
-@hydra.main(config_path=".", config_name="offline_config", version_base="1.1")
+@hydra.main(config_path=".", config_name="offline_config", version_base="1.2")
 def main(cfg: "DictConfig"):  # noqa: F821
     # Create logger
     exp_name = generate_exp_name("CQL-offline", "_WINDRL_")
@@ -65,7 +65,7 @@ def main(cfg: "DictConfig"):  # noqa: F821
     train_env, eval_env = make_env(device, dummy_update), make_env(device, dummy_update)
 
     # Create replay buffer
-    filepath = os.getcwd() + '/../../../offline/testing/buffer_test'  # Points to storage location of offline buffer
+    filepath = os.getcwd() + '/offline/testing/buffer_test'  # Points to storage location of offline buffer
     replay_buffer = make_offline_replay_buffer(cfg, filepath)
 
     # Create agent
