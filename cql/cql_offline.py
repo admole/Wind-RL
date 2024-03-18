@@ -11,6 +11,14 @@ The helper functions are coded in the utils.py associated with this script.
 """
 import time
 import os
+import sys
+from pathlib import Path
+
+path = Path(os.getcwd())
+sys.path.insert(0, str(path))
+path = path.parent.absolute()
+sys.path.insert(0, str(path))
+
 import hydra
 import numpy as np
 import torch
@@ -56,7 +64,7 @@ def main(cfg: "DictConfig"):  # noqa: F821
     train_env, eval_env = make_env(device, dummy_update=True), make_env(device, dummy_update=True)
 
     # Create replay buffer
-    filepath = os.getcwd() + '/../../../../offline/testing/buffer_test'  # Points to storage location of offline buffer
+    filepath = os.getcwd() + '/../../../offline/testing/buffer_test'  # Points to storage location of offline buffer
     replay_buffer = make_offline_replay_buffer(cfg, filepath)
 
     # Create agent
