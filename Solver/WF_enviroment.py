@@ -18,6 +18,12 @@ from torchrl.envs import (
     Transform,
     TransformedEnv,
     UnsqueezeTransform,
+    ClipTransform,
+    DoubleToFloat,
+    ExplorationType,
+    RewardSum,
+    StepCounter,
+    VecNorm,
 )
 from torchrl.envs.transforms.transforms import _apply_to_composite
 from torchrl.envs.utils import check_env_specs, step_mdp
@@ -221,6 +227,18 @@ class TurbEnv(EnvBase):
         if batch_size:
             td = td.expand(batch_size).contiguous()
         return td
+
+
+# ====================================================================
+# Environment utils
+# --------------------------------------------------------------------
+
+
+def make_env(device="cpu", dummy_update=False):
+    base_env = TurbEnv(device=device, dummy_update=dummy_update)
+    env = TransformedEnv(base_env)
+    env.append_transform(RewardSum())
+    return env
 
 
 if __name__ == '__main__':
