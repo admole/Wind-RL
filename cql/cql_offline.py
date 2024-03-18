@@ -26,7 +26,6 @@ from utils import (
     make_continuous_cql_optimizer,
     make_continuous_loss,
     make_cql_model,
-    make_environment,
     make_offline_replay_buffer,
 )
 
@@ -34,7 +33,7 @@ from utils import (
 @hydra.main(config_path=".", config_name="offline_config", version_base="1.1")
 def main(cfg: "DictConfig"):  # noqa: F821
     # Create logger
-    exp_name = generate_exp_name("CQL-offline", cfg.logger.exp_name)
+    exp_name = generate_exp_name("CQL-offline", "_WINDRL_")
     logger = None
     if cfg.logger.backend:
         logger = get_logger(
@@ -51,15 +50,13 @@ def main(cfg: "DictConfig"):  # noqa: F821
     # Set seeds
     torch.manual_seed(cfg.env.seed)
     np.random.seed(cfg.env.seed)
-    device = torch.device('cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create env
-    # train_env, eval_env = make_environment(cfg, cfg.logger.eval_envs)
     train_env, eval_env = make_env(device, dummy_update=True), make_env(device, dummy_update=True)
 
     # Create replay buffer
-    filepath = '/Users/max/PycharmProjects/Wind-RL/offline/testing/buffer_test'
-    # filepath = os.getcwd() + '/../../../../offline/testing/tiny_buffer'  # Points to storage location of offline buffer
+    filepath = os.getcwd() + '/../../../../offline/testing/buffer_test'  # Points to storage location of offline buffer
     replay_buffer = make_offline_replay_buffer(cfg, filepath)
 
     # Create agent

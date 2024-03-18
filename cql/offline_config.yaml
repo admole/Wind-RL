@@ -1,18 +1,13 @@
 # env and task
 env:
-  name: Hopper-v4
-  task: ""
-  library: gym
-  n_samples_stats: 1000
   seed: 0
-  backend: gymnasium
+  dummy_update: False  # Set this to True to do a dummy update instead of using the real env. For debugging only.
 
 # logger
 logger:
   backend: wandb
-  project_name: torchrl_example_cql
+  project_name: TESTING_offline_windRL
   group_name: null
-  exp_name: cql_${replay_buffer.dataset}
   eval_iter: 5000
   eval_steps: 1000
   mode: online
@@ -20,7 +15,6 @@ logger:
 
 # replay buffer
 replay_buffer:
-  dataset: hopper-medium-v2
   batch_size: 256
 
 # optimization
