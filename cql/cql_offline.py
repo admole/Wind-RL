@@ -59,9 +59,10 @@ def main(cfg: "DictConfig"):  # noqa: F821
     torch.manual_seed(cfg.env.seed)
     np.random.seed(cfg.env.seed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    dummy_update = bool(cfg.env.dummy_update)
 
     # Create env
-    train_env, eval_env = make_env(device, dummy_update=True), make_env(device, dummy_update=True)
+    train_env, eval_env = make_env(device, dummy_update), make_env(device, dummy_update)
 
     # Create replay buffer
     filepath = os.getcwd() + '/../../../offline/testing/buffer_test'  # Points to storage location of offline buffer
