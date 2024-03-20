@@ -14,7 +14,7 @@ from ppo.utils import make_env
 
 if __name__ == '__main__':
     
-    filepath = os.getcwd() + '/offline/testing/tiny_buffer'
+    filepath = os.getcwd() + '/testing/buffer_test'
 
     load_storage = LazyMemmapStorage(1000, device='cpu')
     rb_load = TensorDictReplayBuffer(storage=load_storage)
