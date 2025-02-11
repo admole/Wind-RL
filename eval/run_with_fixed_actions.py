@@ -14,48 +14,24 @@ import pickle
 import math
 
 
-def adjust_tensor_shapes(data, env):
-    """
-    Adjust the shapes of tensors for multiagent tensordict.
-    """
-    data.set(
-        ("next", "agents", "done"),
-        data.get(("next", "done"))
-        .unsqueeze(-1)
-        .expand(data.get_item_shape(("next", env.reward_key))),
-    )
-    data.set(
-        ("next", "agents", "terminated"),
-        data.get(("next", "terminated"))
-        .unsqueeze(-1)
-        .expand(data.get_item_shape(("next", env.reward_key))),
-    )
-    data.set(
-        ("next", "done"),
-        data.get(("next", "done"))
-        .unsqueeze(-1)
-        .expand(data.get_item_shape(("next", env.reward_key))),
-    )
-    data.set(
-        ("next", "terminated"),
-        data.get(("next", "terminated"))
-        .unsqueeze(-1)
-        .expand(data.get_item_shape(("next", env.reward_key))),
-    )
-    return data
-
-
-def make_constant_zero_policy(env):
-    return TensorDictModule(lambda x: torch.zeros(env.action_spec.shape[-1]),
-                            in_keys=[env.observation_key], out_keys=[env.action_key])
-
-
 def replay_rollout(reset_td, env, actions):
     # actions is expected to be in the shape [#steps per env, #envs, #actions]
     td = reset_td
+    alpha = []  # will be num_steps x num envs x something
+    done = []
+    reward = []
+    power = []
     for k in range(actions.shape[0]):
         # first, add in the relevant action into the td
-        print(td)
+        td.set(("action"), actions[k])
+        td = env.step(td)
+        alpha.append(td.get(("next", "alpha")).detach().cpu().numpy())
+        reward.append(td.get(("next", "reward")).detach().cpu().numpy())
+        power.append(td.get(("next", "power")).detach().cpu().numpy())
+    alpha = np.stack(alpha, axis=0)
+    reward = np.stack(reward, axis=0)
+    power = np.stack(power, axis=0)
+    return alpha, reward, power
 
 
 
@@ -109,23 +85,7 @@ def main(cfg: "DictConfig"):
         "difference_penalty_scale": cfg.env.difference_penalty_scale,
     }
 
-    # Load the models to be evaluated
-    # Copy the loaded models into the ppo/eval directory
-    if not os.path.exists('models'):
-        os.mkdir('models')
-    for arch in ['actor', 'critic']:
-        filename = f"{arch}_{cfg.eval.model_id}.pkl"
-        if os.path.exists(filename):
-            shutil.move(filename, "models")
-    # Load actor and critic
-    actor, critic = load_model(
-        cfg=cfg,
-        env_params=params,
-        id=cfg.eval.model_id,
-        path_to_model='models',
-        )
-    logging.info(f"Loaded actor_{cfg.eval.model_id}.pkl and critic_{cfg.eval.model_id}.pkl.")
-    actor, critic = actor.to(device), critic.to(device)
+    # IMPORTANT: we need to SHIFT the envs here to make sure we have statistically independent data!
 
     # Create environments
     eval_env = make_parallel_env(
@@ -137,11 +97,13 @@ def main(cfg: "DictConfig"):
     ) # this needs to be modified too, to make sure that we don't just load the same exact envs! Otherwise we are not doing anything
 
     # Load actions to replay
-    actions_replay = torch.zeros([10, 16, 3])  # num steps per env x num envs x num actions
+    actions_replay = torch.zeros([200, 5, 3])  # num steps per env x num envs x num actions
 
-    # Compute number of resets to be done in between eval runs
-    num_inbetween_resets = math.ceil(float(cfg.eval.inbetween_reset_frames) / cfg.env.reset_frames)
-    num_rollouts_per_env = cfg.eval.num_rollouts
+    # Checks to make sure shapes match
+    assert len(actions_replay.shape) == 3
+    assert actions_replay.shape[0] == cfg.eval.episode_length
+    assert actions_replay.shape[1] == cfg.eval.n_parallel  # should be 16
+    assert actions_replay.shape[2] == 3  # num of turbs
 
     # Initial reset to burn in simulation
     logging.info(f'Initial reset: collecting {(1 + cfg.eval.initial_reset_frames // cfg.env.reset_frames)*cfg.env.reset_frames} frames ({1 + cfg.eval.initial_reset_frames // cfg.env.reset_frames} resets with {cfg.env.reset_frames} frames each.).')
@@ -159,38 +121,10 @@ def main(cfg: "DictConfig"):
     logs = {}
 
     with set_exploration_type(ExplorationType.MEAN), torch.no_grad():
-        replay_rollout(reset_td, eval_env, actions_replay)
+        alpha, reward, power = replay_rollout(reset_td, eval_env, actions_replay)
         
-        data = None
-        if cfg.multi_agent.use:
-            data = adjust_tensor_shapes(data, eval_env)
-
-        # Get rewards and episode lengths
-        # No "agents" in single agent
-        if cfg.multi_agent.use:
-            episode_rewards = data["next", "agents", "episode_reward"][data["next", "done"]]
-            reward_shape = data.get_item_shape(("next", eval_env.reward_key))
-            episode_rewards = episode_rewards.view(reward_shape[-2], reward_shape[0]).mean(dim=0)
-            episode_length = data["next", "step_count"][data["next", "done"].all(-2)]
-            rewards = data["next", "agents", "reward"].squeeze().mean(dim=-1)
-            alpha = data["agents", "alpha"].squeeze()
-            actions = data["agents", "action"].squeeze()
-        else:
-            episode_rewards = data["next", "episode_reward"][data["next", "done"]]
-            reward_shape = data.get_item_shape(("next", "reward"))
-            episode_rewards = episode_rewards.view(reward_shape[-1], reward_shape[0]).mean(dim=0)
-            episode_length = data["next", "step_count"][data["next", "done"]]
-            rewards = data["next", "reward"].squeeze()
-            observations = data["next", "observation"]
-            alpha = data["alpha"].squeeze()
-            actions = data["action"].squeeze()
-            power = data.get(("next", "power")).squeeze()
-            episode_power = data.get(("next", "episode_power"))[data["next", "done"]]
-            episode_power = episode_power.view(reward_shape[-1], reward_shape[0]).mean(dim=0)
-
-        if not len(episode_length) > 0:
-            raise RuntimeWarning("The eval tensordict does not contain a finished episode.")
         
+
         for i in range(n_environments):
             logs[f"episode_reward_ENV_{i+1}_EPISODE_{1}"] = episode_rewards[i].item()
             logs[f"episode_length_ENV_{i+1}_EPISODE_{1}"] = episode_length[i].item()

@@ -118,8 +118,6 @@ def launch_eval(experiment, cfg, dummy_update=False):
     
     file_list += [f"./{algo}/utils_{algo}.py"]  # SAC files
     file_list += ["./Solver/WF_enviroment.py", "./Solver/ADM_setup.py", "./Solver/farm.py"]  # Env and simulator
-    file_list += [f"{cfg.eval.training_name}/{algo}/checkpoints/actor_{cfg.eval.model_id}.pkl"]
-    file_list += [f"{cfg.eval.training_name}/{algo}/checkpoints/critic_{cfg.eval.model_id}.pkl"]
     producer.attach_generator_files(to_copy=file_list)
 
     experiment.generate(producer, overwrite=True)
@@ -142,10 +140,10 @@ if __name__ == '__main__':
 
     training_name = cfg_eval.eval.training_name
     # run_name = training_name.replace("training", "eval", 1)  # not good
-    run_name = training_name + "_eval_" + datetime.now().strftime("%Y-%m-%d_%H-%M")
+    run_name = training_name + "_fixed_action_replay_" + datetime.now().strftime("%Y-%m-%d_%H-%M")
     dummy_update = cfg_eval.eval.dummy_update
 
-    print(f"Launching eval run at {run_name}.")
+    print(f"Launching fixed action replay run at {run_name}.")
 
     if 'ppo' in run_name.lower():
         with initialize(config_path=f"{training_name}/ppo/outputs/hydra_logs", version_base="1.2"):
