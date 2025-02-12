@@ -80,6 +80,14 @@ def make_parallel_env(cfg, params, num_envs, device="cpu", eval_only=False):
     return env
 
 
+def make_parallel_env_shifted(cfg, params, num_envs, device="cpu", eval_only=True):
+    # This function is only here to test if the controller is active. Don't use otherwise.
+    function_list = [lambda i=i: make_env(cfg, params, instance=i+16, device=device, eval_only=eval_only) for i in
+                     range(num_envs)]
+    env = ParallelEnv(num_envs, function_list)
+    return env
+
+
 # ====================================================================
 # Collector and replay buffer
 # ---------------------------

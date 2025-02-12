@@ -18,20 +18,22 @@ def replay_rollout(reset_td, env, actions):
     # actions is expected to be in the shape [#steps per env, #envs, #actions]
     td = reset_td
     alpha = []  # will be num_steps x num envs x something
-    done = []
     reward = []
     power = []
+    action = []
     for k in range(actions.shape[0]):
         # first, add in the relevant action into the td
         td.set(("action"), actions[k])
         td = env.step(td)
         alpha.append(td.get(("next", "alpha")).detach().cpu().numpy())
+        action.append(td.get(("next", "action")).detach().cpu().numpy())
         reward.append(td.get(("next", "reward")).detach().cpu().numpy())
         power.append(td.get(("next", "power")).detach().cpu().numpy())
-    alpha = np.stack(alpha, axis=0)
-    reward = np.stack(reward, axis=0)
-    power = np.stack(power, axis=0)
-    return alpha, reward, power
+    alpha = np.stack(alpha, axis=0).transpose(0,1)
+    action = np.stack(action, axis=0).transpose(0,1)
+    reward = np.stack(reward, axis=0).transpose(0,1)
+    power = np.stack(power, axis=0).transpose(0,1)
+    return alpha, action, reward, power
 
 
 
@@ -40,10 +42,8 @@ def main(cfg: "DictConfig"):
     device = "cpu"  # Run on CPU only
     logging.info(f'Running on device: {device}.')
 
-    if 'ppo' in cfg.eval.training_name.lower():
-        from utils_ppo import make_parallel_env, load_model, save_model, log_metrics
-    elif 'sac' in cfg.eval.training_name.lower():
-        from utils_sac import make_parallel_env, load_model, save_model, log_metrics
+    if 'sac' in cfg.eval.training_name.lower():
+        from utils_sac import make_parallel_env_shifted
     else:
         raise Exception("Can not determine training algorithm")
 
@@ -85,10 +85,9 @@ def main(cfg: "DictConfig"):
         "difference_penalty_scale": cfg.env.difference_penalty_scale,
     }
 
-    # IMPORTANT: we need to SHIFT the envs here to make sure we have statistically independent data!
-
     # Create environments
-    eval_env = make_parallel_env(
+    # These are SHIFTED by 16, so that env 1 is actually env 17 etc...
+    eval_env = make_parallel_env_shifted(
         cfg,
         params,
         n_environments,
@@ -97,13 +96,13 @@ def main(cfg: "DictConfig"):
     ) # this needs to be modified too, to make sure that we don't just load the same exact envs! Otherwise we are not doing anything
 
     # Load actions to replay
-    actions_replay = torch.zeros([200, 5, 3])  # num steps per env x num envs x num actions
+    actions_replay = torch.zeros([cfg.eval.episode_length, cfg.eval.n_parallel, cfg.env.turbines])  # num steps per env x num envs x num actions
 
     # Checks to make sure shapes match
     assert len(actions_replay.shape) == 3
     assert actions_replay.shape[0] == cfg.eval.episode_length
     assert actions_replay.shape[1] == cfg.eval.n_parallel  # should be 16
-    assert actions_replay.shape[2] == 3  # num of turbs
+    assert actions_replay.shape[2] == cfg.env.turbines  # num of turbs
 
     # Initial reset to burn in simulation
     logging.info(f'Initial reset: collecting {(1 + cfg.eval.initial_reset_frames // cfg.env.reset_frames)*cfg.env.reset_frames} frames ({1 + cfg.eval.initial_reset_frames // cfg.env.reset_frames} resets with {cfg.env.reset_frames} frames each.).')
@@ -121,19 +120,15 @@ def main(cfg: "DictConfig"):
     logs = {}
 
     with set_exploration_type(ExplorationType.MEAN), torch.no_grad():
-        alpha, reward, power = replay_rollout(reset_td, eval_env, actions_replay)
+        alpha, actions, rewards, power = replay_rollout(reset_td, eval_env, actions_replay)
         
-        
+        print(alpha.shape, rewards.shape, power.shape)
 
         for i in range(n_environments):
-            logs[f"episode_reward_ENV_{i+1}_EPISODE_{1}"] = episode_rewards[i].item()
-            logs[f"episode_length_ENV_{i+1}_EPISODE_{1}"] = episode_length[i].item()
-            logs[f"rewards_ENV_{i+1}_EPISODE_{1}"] = rewards[i].detach().cpu().numpy()
-            logs[f"alphas_ENV_{i+1}_EPISODE_{1}"] = alpha[i].detach().cpu().numpy()
-            logs[f"actions_ENV_{i+1}_EPISODE_{1}"] = actions[i].detach().cpu().numpy()
-            logs[f"observations_ENV_{i+1}_EPISODE_{1}"] = observations[i].detach().cpu().numpy()
-            logs[f"episode_power_ENV_{i+1}_EPISODE_{1}"] = episode_power[i].item()
-            logs[f"power_ENV_{i+1}_EPISODE_{1}"] = power[i].detach().cpu().numpy()
+            logs[f"rewards_ENV_{i+1}"] = rewards[i].detach().cpu().numpy()
+            logs[f"alphas_ENV_{i+1}"] = alpha[i].detach().cpu().numpy()
+            logs[f"actions_ENV_{i+1}"] = actions[i].detach().cpu().numpy()
+            logs[f"power_ENV_{i+1}"] = power[i].detach().cpu().numpy()
         
 
     # End timing
