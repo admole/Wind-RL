@@ -3,7 +3,8 @@
 eval:
   episode_length: 2000
   n_parallel: 16  # Number of eval envs to be run in parallel
-  training_name: launch_dummy_SAC_run  # Path to stored model, relative to Wind-RL/
+  training_name: launch_dummy_SAC_run  # this is useless here, ignore
+  eval_name: launch_dummy_SAC_run_eval  # Path to stored model, relative to Wind-RL/
   model_id: 515  # ID of model to be evaluated
   save_flow: False  # WARNING this will save HUGE amounts of data
   dummy_update: False

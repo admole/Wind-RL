@@ -13,6 +13,14 @@ from omegaconf import OmegaConf
 from datetime import datetime
 
 
+def find_file(directory, filename):
+        # Traverse the directory recursively
+        for root, dirs, files in os.walk(directory):
+            if filename in files:
+                return os.path.join(root, filename)
+        raise FileNotFoundError(f"WAAAAAAAAaaAHUHJRHAJKRHIUA")
+
+
 def launch_database(experiment, port, dummy_update=False):
     interface = ['hsn0', 'hsn1'] if not dummy_update else 'lo'
     db = experiment.create_database(port=port, db_nodes=1, interface=interface)
@@ -109,15 +117,13 @@ def launch_eval(experiment, cfg, dummy_update=False):
     # scripts to execution location inside newly created dir
     # only necessary if its not an executable (python is executable here)
     file_list = ["./eval/run_with_fixed_actions.py"]
-    if 'ppo' in cfg.eval.training_name.lower():
-        algo = 'ppo'
-    elif 'sac' in cfg.eval.training_name.lower():
-        algo = 'sac'
-    else:
-        raise ValueError(f"Could not determine algorithm.")
+    algo = 'sac'
     
     file_list += [f"./{algo}/utils_{algo}.py"]  # SAC files
     file_list += ["./Solver/WF_enviroment.py", "./Solver/ADM_setup.py", "./Solver/farm.py"]  # Env and simulator
+    # we gotta find the logs file in the output folder
+    log_path = find_file(cfg.eval_name, "eval_logs.pkl")
+    file_list += [log_path]
     producer.attach_generator_files(to_copy=file_list)
 
     experiment.generate(producer, overwrite=True)
@@ -133,30 +139,33 @@ if __name__ == '__main__':
     # Any arguments (space-separated) are taken to be modifiers for the config file
     # We assume that the arguments are valid modifiers for the config; this is not tested here.
     # An example of a valid modifier is "optim.gamma=0.9"
-    config_modifiers = list(sys.argv[1:]) if len(sys.argv) > 1 else [""]
+    if len(sys.argv) != 2:
+        raise ValueError("give me input or else")
+    path_to_eval_directory = sys.argv[1]
 
-    with initialize(config_path="eval", version_base="1.2"):
-        cfg_eval = compose(config_name="config_eval.yaml", overrides=config_modifiers)
+    # just find the joined config from the eval run
+    config_path = find_file(path_to_eval_directory, "config.yaml")
 
-    training_name = cfg_eval.eval.training_name
-    # run_name = training_name.replace("training", "eval", 1)  # not good
-    run_name = training_name + "_fixed_action_replay_" + datetime.now().strftime("%Y-%m-%d_%H-%M")
-    dummy_update = cfg_eval.eval.dummy_update
+    with initialize(config_path=os.path.dirname(config_path), version_base="1.2"):
+        cfg = compose(config_name="config.yaml")
+        OmegaConf.set_struct(cfg, False)
+        cfg.eval_name = path_to_eval_directory # Now this works
+        OmegaConf.set_struct(cfg, True)
+
+    eval_name = path_to_eval_directory
+    # run_name = eval_name.replace("training", "eval", 1)  # not good
+    run_name = eval_name + "_fixed_action_replay_" + datetime.now().strftime("%Y-%m-%d_%H-%M")
+    dummy_update = cfg.eval.dummy_update
 
     print(f"Launching fixed action replay run at {run_name}.")
 
-    if 'ppo' in run_name.lower():
-        with initialize(config_path=f"{training_name}/ppo/outputs/hydra_logs", version_base="1.2"):
-            cfg_train = compose(config_name="config.yaml")
-    elif 'sac' in run_name.lower():
-        with initialize(config_path=f"{training_name}/sac/outputs/hydra_logs", version_base="1.2"):
-            cfg_train = compose(config_name="config.yaml")
-    else:
-        raise Exception("Can not determine training algorithm. We expect to find the name of the algorithm in the directory name.")
-
-    # Merge configurations
-    cfg = {**cfg_eval, **cfg_train}
-    cfg = OmegaConf.create(cfg)
+    print("What I will do is the following:")
+    print("I will use the eval config specified in the same way as when an eval run is launched")
+    print(f"I will copy the rest of the configs from the {eval_name} directory")
+    print("I will install a computer virus that will steal your identity.")
+    print("I will assume that this directory contains eval_logs.pkl, from an eval run of this trained model.")
+    print("The actions replayed will be the ones stored in eval_logs.pkl")
+    print("I will ignore most common sense checks and just copy things around wildly.")
 
     # Set up experiment
     exp = Experiment(run_name, launcher="auto")

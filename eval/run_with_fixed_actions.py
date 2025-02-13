@@ -26,15 +26,14 @@ def replay_rollout(reset_td, env, actions):
         td.set(("action"), actions[k])
         td = env.step(td)
         alpha.append(td.get(("next", "alpha")).detach().cpu().numpy())
-        action.append(td.get(("next", "action")).detach().cpu().numpy())
+        action.append(td.get("action").detach().cpu().numpy())
         reward.append(td.get(("next", "reward")).detach().cpu().numpy())
         power.append(td.get(("next", "power")).detach().cpu().numpy())
-    alpha = np.stack(alpha, axis=0).transpose(0,1)
-    action = np.stack(action, axis=0).transpose(0,1)
-    reward = np.stack(reward, axis=0).transpose(0,1)
-    power = np.stack(power, axis=0).transpose(0,1)
+    alpha = np.stack(alpha, axis=0).transpose((1,0,2))
+    action = np.stack(action, axis=0).transpose((1,0,2))
+    reward = np.stack(reward, axis=0).transpose((1,0,2))
+    power = np.stack(power, axis=0).transpose((1,0,2))
     return alpha, action, reward, power
-
 
 
 @hydra.main(config_path="./", config_name="config_eval.yaml", version_base="1.2")
@@ -43,7 +42,7 @@ def main(cfg: "DictConfig"):
     logging.info(f'Running on device: {device}.')
 
     if 'sac' in cfg.eval.training_name.lower():
-        from utils_sac import make_parallel_env_shifted
+        from utils_sac import make_parallel_env_shifted, make_parallel_env
     else:
         raise Exception("Can not determine training algorithm")
 
@@ -88,6 +87,7 @@ def main(cfg: "DictConfig"):
     # Create environments
     # These are SHIFTED by 16, so that env 1 is actually env 17 etc...
     eval_env = make_parallel_env_shifted(
+    # eval_env = make_parallel_env(   # for dummy env this is necessary
         cfg,
         params,
         n_environments,
@@ -96,7 +96,18 @@ def main(cfg: "DictConfig"):
     ) # this needs to be modified too, to make sure that we don't just load the same exact envs! Otherwise we are not doing anything
 
     # Load actions to replay
-    actions_replay = torch.zeros([cfg.eval.episode_length, cfg.eval.n_parallel, cfg.env.turbines])  # num steps per env x num envs x num actions
+    with open('eval_logs.pkl', 'rb') as f:
+        eval_logs = pickle.load(f)
+
+    actions_replay = []
+    for n_env in range(1, n_environments+1):
+        actions = eval_logs[f'actions_ENV_{n_env}_EPISODE_1']  # n_steps x num_turbs
+        actions_replay.append(actions)
+    actions_replay = np.stack(actions_replay, axis=0)  # n_envs x n_steps x num_turbs
+    print(actions_replay.shape)
+    actions_replay = actions_replay.transpose((1,0,2))  # n_steps x n_envs x num_turbs
+
+    # actions_replay = torch.zeros([cfg.eval.episode_length, cfg.eval.n_parallel, cfg.env.turbines])  # num steps per env x num envs x num actions
 
     # Checks to make sure shapes match
     assert len(actions_replay.shape) == 3
@@ -121,14 +132,12 @@ def main(cfg: "DictConfig"):
 
     with set_exploration_type(ExplorationType.MEAN), torch.no_grad():
         alpha, actions, rewards, power = replay_rollout(reset_td, eval_env, actions_replay)
-        
-        print(alpha.shape, rewards.shape, power.shape)
 
         for i in range(n_environments):
-            logs[f"rewards_ENV_{i+1}"] = rewards[i].detach().cpu().numpy()
-            logs[f"alphas_ENV_{i+1}"] = alpha[i].detach().cpu().numpy()
-            logs[f"actions_ENV_{i+1}"] = actions[i].detach().cpu().numpy()
-            logs[f"power_ENV_{i+1}"] = power[i].detach().cpu().numpy()
+            logs[f"rewards_ENV_{i+1}"] = rewards[i]
+            logs[f"alphas_ENV_{i+1}"] = alpha[i]
+            logs[f"actions_ENV_{i+1}"] = actions[i]
+            logs[f"power_ENV_{i+1}"] = power[i]
         
 
     # End timing
