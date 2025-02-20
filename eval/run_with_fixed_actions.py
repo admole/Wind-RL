@@ -16,6 +16,7 @@ import math
 
 def replay_rollout(reset_td, env, actions):
     # actions is expected to be in the shape [#steps per env, #envs, #actions]
+    # update this to accommodate several episodes
     td = reset_td
     alpha = []  # will be num_steps x num envs x something
     reward = []
@@ -85,9 +86,9 @@ def main(cfg: "DictConfig"):
     }
 
     # Create environments
-    # These are SHIFTED by 16, so that env 1 is actually env 17 etc...
-    eval_env = make_parallel_env_shifted(
-    # eval_env = make_parallel_env(   # for dummy env this is necessary
+    # These are the ORIGINAL 16 envs (ie 1...16, the same ones used to compute the angles)
+    # eval_env = make_parallel_env_shifted(
+    eval_env = make_parallel_env(
         cfg,
         params,
         n_environments,
@@ -124,6 +125,9 @@ def main(cfg: "DictConfig"):
         logging.info(f"{100*i/(cfg.eval.initial_reset_frames // cfg.env.reset_frames):.1f}% done with initial reset.")
     logging.info(f"100% done with initial reset.")
 
+    num_inbetween_resets = math.ceil(float(cfg.eval.inbetween_reset_frames) / cfg.env.reset_frames)
+    num_rollouts_per_env = cfg.eval.num_rollouts
+
     logging.info('Starting evaluation...')
 
     # Timing
@@ -131,14 +135,21 @@ def main(cfg: "DictConfig"):
     logs = {}
 
     with set_exploration_type(ExplorationType.MEAN), torch.no_grad():
-        alpha, actions, rewards, power = replay_rollout(reset_td, eval_env, actions_replay)
+        for k in range(num_rollouts_per_env):
+            logging.info(f"Commencing rollout #{k+1} across {n_environments} environments.")
+            # IMPORTANT: double check whether the original rollout function actually executes a reset
+            # either at the first call or at the end of an episode automatically???
+            alpha, actions, rewards, power = replay_rollout(reset_td, eval_env, actions_replay)
 
-        for i in range(n_environments):
-            logs[f"rewards_ENV_{i+1}"] = rewards[i]
-            logs[f"alphas_ENV_{i+1}"] = alpha[i]
-            logs[f"actions_ENV_{i+1}"] = actions[i]
-            logs[f"power_ENV_{i+1}"] = power[i]
-        
+            for i in range(n_environments):
+                logs[f"rewards_ENV_{i+1}_EPISODE_{k+1}"] = rewards[i]
+                logs[f"alphas_ENV_{i+1}_EPISODE_{k+1}"] = alpha[i]
+                logs[f"actions_ENV_{i+1}_EPISODE_{k+1}"] = actions[i]
+                logs[f"power_ENV_{i+1}_EPISODE_{k+1}"] = power[i]
+            
+            # Reset environments before next episode
+            for _ in range(num_inbetween_resets):
+                reset_td = eval_env.reset()
 
     # End timing
     end_time = time.time()
