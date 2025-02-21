@@ -14,7 +14,7 @@ import pickle
 import math
 
 
-def replay_rollout(env, actions):
+def replay_rollout(env, angles):
     # actions is expected to be in the shape [#steps per env, #envs, #actions]
     alpha = []  # will be num_steps x num envs x something
     reward = []
@@ -22,9 +22,10 @@ def replay_rollout(env, actions):
     action = []
     # initial reset
     td = env.reset()
-    for k in range(actions.shape[0]):
+    for k in range(angles.shape[0]):
         # first, add in the relevant action into the td
-        td.set(("action"), actions[k])
+        td.set(("alpha"), angles[k])
+        td.set(("action"), np.zeros_like(angles[k]))
         td = env.step(td)
         alpha.append(td.get(("next", "alpha")).detach().cpu().numpy())
         action.append(td.get("action").detach().cpu().numpy())
@@ -105,7 +106,7 @@ def main(cfg: "DictConfig"):
     for n_ep in range(1, num_rollouts+1):
         actions_per_episode = []
         for n_env in range(1, n_environments+1):
-            actions = eval_logs[f'actions_ENV_{n_env}_EPISODE_{n_ep}']  # n_steps x num_turbs
+            actions = eval_logs[f'alphas_ENV_{n_env}_EPISODE_{n_ep}']  # n_steps x num_turbs
             actions_per_episode.append(actions)
         actions_replay.append(actions_per_episode)
     actions_replay = np.stack(actions_replay, axis=0)  # n_rollouts x n_envs x n_steps x num_turbs
