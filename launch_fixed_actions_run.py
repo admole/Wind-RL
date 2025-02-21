@@ -11,6 +11,7 @@ from Solver.farm import Farm, Turbine
 from hydra import initialize, compose
 from omegaconf import OmegaConf
 from datetime import datetime
+from pathlib import Path
 
 
 def find_file(directory, filename):
@@ -128,9 +129,9 @@ def launch_eval(experiment, cfg, dummy_update=False):
 
     experiment.generate(producer, overwrite=True)
 
-    if not os.path.exists(f"./{experiment.name}/eval/"):
-        os.makedirs(f"./{experiment.name}/eval/")
-    OmegaConf.save(cfg, f"./{experiment.name}/eval/config_eval.yaml")
+    if not os.path.exists(f"{experiment.name}/eval/"):
+        os.makedirs(f"{experiment.name}/eval/")
+    OmegaConf.save(cfg, f"{experiment.name}/eval/config_eval.yaml")
 
     return producer
 
@@ -152,9 +153,10 @@ if __name__ == '__main__':
         cfg.eval_name = path_to_eval_directory # Now this works
         OmegaConf.set_struct(cfg, True)
 
-    eval_name = path_to_eval_directory
-    # run_name = eval_name.replace("training", "eval", 1)  # not good
-    run_name = eval_name + "_fixed_action_replay_" + datetime.now().strftime("%Y-%m-%d_%H-%M")
+    # eval_name = Path(path_to_eval_directory)
+    eval_name = Path(path_to_eval_directory).resolve().with_name(Path(path_to_eval_directory).name.rstrip("/"))
+    # run_name = str(eval_name / Path("_fixed_action_replay_" + datetime.now().strftime("%Y-%m-%d_%H-%M")))
+    run_name = str(eval_name.with_name(eval_name.name + "_fixed_action_replay_" + datetime.now().strftime("%Y-%m-%d_%H-%M")))
     dummy_update = cfg.eval.dummy_update
 
     print(f"Launching fixed action replay run at {run_name}.")

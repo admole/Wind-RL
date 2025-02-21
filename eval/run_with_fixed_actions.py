@@ -16,7 +16,6 @@ import math
 
 def replay_rollout(reset_td, env, actions):
     # actions is expected to be in the shape [#steps per env, #envs, #actions]
-    # update this to accommodate several episodes
     td = reset_td
     alpha = []  # will be num_steps x num envs x something
     reward = []
@@ -56,6 +55,7 @@ def main(cfg: "DictConfig"):
 
     max_episode_length = cfg.eval.episode_length
     n_environments = cfg.eval.n_parallel
+    num_rollouts = cfg.eval.num_rollouts
 
     hydra_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     results_dir = os.path.join(hydra_dir, 'RESULTS')
@@ -101,20 +101,23 @@ def main(cfg: "DictConfig"):
         eval_logs = pickle.load(f)
 
     actions_replay = []
-    for n_env in range(1, n_environments+1):
-        actions = eval_logs[f'actions_ENV_{n_env}_EPISODE_1']  # n_steps x num_turbs
-        actions_replay.append(actions)
-    actions_replay = np.stack(actions_replay, axis=0)  # n_envs x n_steps x num_turbs
-    print(actions_replay.shape)
-    actions_replay = actions_replay.transpose((1,0,2))  # n_steps x n_envs x num_turbs
+    for n_ep in range(1, num_rollouts+1):
+        actions_per_episode = []
+        for n_env in range(1, n_environments+1):
+            actions = eval_logs[f'actions_ENV_{n_env}_EPISODE_{n_ep}']  # n_steps x num_turbs
+            actions_per_episode.append(actions)
+        actions_replay.append(actions_per_episode)
+    actions_replay = np.stack(actions_replay, axis=0)  # n_rollouts x n_envs x n_steps x num_turbs
+    actions_replay = actions_replay.transpose((0, 2, 1, 3))  # n_rollouts x n_steps x n_envs x num_turbs
 
     # actions_replay = torch.zeros([cfg.eval.episode_length, cfg.eval.n_parallel, cfg.env.turbines])  # num steps per env x num envs x num actions
 
     # Checks to make sure shapes match
-    assert len(actions_replay.shape) == 3
-    assert actions_replay.shape[0] == cfg.eval.episode_length
-    assert actions_replay.shape[1] == cfg.eval.n_parallel  # should be 16
-    assert actions_replay.shape[2] == cfg.env.turbines  # num of turbs
+    assert len(actions_replay.shape) == 4
+    assert actions_replay.shape[1] == cfg.eval.episode_length
+    assert actions_replay.shape[0] == cfg.eval.num_rollouts  # should be 16
+    assert actions_replay.shape[2] == cfg.eval.n_parallel  # should be 16
+    assert actions_replay.shape[3] == cfg.env.turbines  # num of turbs
 
     # Initial reset to burn in simulation
     logging.info(f'Initial reset: collecting {(1 + cfg.eval.initial_reset_frames // cfg.env.reset_frames)*cfg.env.reset_frames} frames ({1 + cfg.eval.initial_reset_frames // cfg.env.reset_frames} resets with {cfg.env.reset_frames} frames each.).')
@@ -126,7 +129,6 @@ def main(cfg: "DictConfig"):
     logging.info(f"100% done with initial reset.")
 
     num_inbetween_resets = math.ceil(float(cfg.eval.inbetween_reset_frames) / cfg.env.reset_frames)
-    num_rollouts_per_env = cfg.eval.num_rollouts
 
     logging.info('Starting evaluation...')
 
@@ -135,11 +137,11 @@ def main(cfg: "DictConfig"):
     logs = {}
 
     with set_exploration_type(ExplorationType.MEAN), torch.no_grad():
-        for k in range(num_rollouts_per_env):
+        for k in range(num_rollouts):
             logging.info(f"Commencing rollout #{k+1} across {n_environments} environments.")
             # IMPORTANT: double check whether the original rollout function actually executes a reset
             # either at the first call or at the end of an episode automatically???
-            alpha, actions, rewards, power = replay_rollout(reset_td, eval_env, actions_replay)
+            alpha, actions, rewards, power = replay_rollout(reset_td, eval_env, actions_replay[k])
 
             for i in range(n_environments):
                 logs[f"rewards_ENV_{i+1}_EPISODE_{k+1}"] = rewards[i]
