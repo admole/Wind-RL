@@ -14,13 +14,14 @@ import pickle
 import math
 
 
-def replay_rollout(reset_td, env, actions):
+def replay_rollout(env, actions):
     # actions is expected to be in the shape [#steps per env, #envs, #actions]
-    td = reset_td
     alpha = []  # will be num_steps x num envs x something
     reward = []
     power = []
     action = []
+    # initial reset
+    td = env.reset()
     for k in range(actions.shape[0]):
         # first, add in the relevant action into the td
         td.set(("action"), actions[k])
@@ -141,7 +142,7 @@ def main(cfg: "DictConfig"):
             logging.info(f"Commencing rollout #{k+1} across {n_environments} environments.")
             # IMPORTANT: double check whether the original rollout function actually executes a reset
             # either at the first call or at the end of an episode automatically???
-            alpha, actions, rewards, power = replay_rollout(reset_td, eval_env, actions_replay[k])
+            alpha, actions, rewards, power = replay_rollout(eval_env, actions_replay[k])
 
             for i in range(n_environments):
                 logs[f"rewards_ENV_{i+1}_EPISODE_{k+1}"] = rewards[i]
@@ -151,7 +152,7 @@ def main(cfg: "DictConfig"):
             
             # Reset environments before next episode
             for _ in range(num_inbetween_resets):
-                reset_td = eval_env.reset()
+                eval_env.reset()
 
     # End timing
     end_time = time.time()
