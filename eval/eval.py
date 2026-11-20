@@ -57,6 +57,35 @@ def make_constant_zero_policy(cfg):
     return actor
 
 
+def make_lookup_table_policy(cfg):
+    lut_np = np.load(cfg.eval.lookup_table_path)
+    lookup_table = torch.from_numpy(lut_np)
+
+    def forward_fn(obs, alpha):
+        # raise RuntimeError(f"\nTD Shape: \n{td.shape}")
+        # vector = td[:, 66:67]  # This indexing is the  central, most forward probe when there are 2 wind measurements (ux, uz) and 77 probes per turbine
+        # obs = td["observation"]
+        # alpha = td["alpha"]
+        ux = obs[:, 66] * 6 + 6
+        uz = obs[:, 67] * 4
+        wind_angle = torch.rad2deg(torch.atan2(uz, ux))
+        wind_angle = wind_angle.clamp(-10, 10)
+        idx = torch.round((wind_angle + 10.0) / 0.5).long()
+        new_alpha = lookup_table[idx]
+        dt = 10.0  # TODO: should not be hardcoded 
+        action = (new_alpha - alpha) / dt
+        action = action.clamp(-1.0, 1.0) # hardcoded max angular vel
+
+        return action
+
+    actor = TensorDictModule(
+        forward_fn,
+        in_keys=["observation", "alpha"],
+        out_keys=["action"]
+    )
+    return actor
+
+
 @hydra.main(config_path="./", config_name="config_eval.yaml", version_base="1.2")
 def main(cfg: "DictConfig"):
     device = "cpu"  # Run on CPU only
@@ -122,6 +151,10 @@ def main(cfg: "DictConfig"):
         actor = make_constant_zero_policy(cfg)
         actor.to(device)
         logging.info(f"Created actor which outputs constant angles {cfg.eval.fixed_angles}.")
+    elif cfg.eval.use_lookup_table:
+        actor = make_lookup_table_policy(cfg)
+        actor.to(device)
+        logging.info(f"Created actor which outputs angles from lookuptable.")
     else:
         # Load the models to be evaluated
         # Copy the loaded models into the ppo/eval directory

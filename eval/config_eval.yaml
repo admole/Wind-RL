@@ -9,9 +9,11 @@ eval:
   dummy_update: False
   initial_reset_frames: 5000  # should be 5000
   inbetween_reset_frames: 150  # number of frames to reset before we start the next eval in each env
-  num_rollouts: 1  # number of times we evaluate in each env. We will get num_rollouts * n_parallel total episodes.
-  use_fixed_angles: True
+  num_rollouts: 14  # number of times we evaluate in each env. We will get num_rollouts * n_parallel total episodes.
+  use_fixed_angles: False
   fixed_angles: [0,0,0]  # only relevant if use_fixed_angles is True
+  use_lookup_table: True
+  lookup_table_path: 'optimum.npy'
 
 # Configure hydra
 hydra:
