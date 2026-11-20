@@ -1,6 +1,6 @@
 # environment and task
 env:
-  n_parallel: 5
+  n_parallel: 32
   n_processors_per_env: 128
   dummy_update: False
   env_name: WindFarm
@@ -11,13 +11,13 @@ env:
   turbine_height: 90
   turbine_spacing: 5
   turbine_spacing_z: 7
-  max_yaw_speed: 0.4
+  max_yaw_speed: 1.0
   max_yaw_angle: 40
   steps_per_frame: 50
   reset_frames: 150
   # reset_frames: 3000  # combined for eval
-  initial_reset_frames: 50  # for debugging
-  frame_stack: 5  # Number of frames to be stacked as agent input
+  initial_reset_frames: 5000
+  frame_stack: 1  # Number of frames to be stacked as agent input
   reward_average_steps: 1  # Number of frames over which to average the reward
   penalty_scale: 0.5
   penalty_exp: 26
@@ -33,10 +33,10 @@ multi_agent:
 
 # collector
 collector:
-  total_frames: 200_000
-  init_random_frames: 100  # 32_000
+  total_frames: 1_000_000
+  init_random_frames: 32_000
   max_episode_length: 500  # Timesteps
-  frames_per_batch: 512
+  frames_per_batch: 1024
   device: cpu
   reset_at_each_iter: False
 
@@ -47,14 +47,14 @@ replay_buffer:
 
 # optim
 optim:
-  gamma: 0.9
-  lr: 3.0e-4
+  gamma: 0.99
+  lr: 3.0e-6
   entropy_lr: 3.0e-4
   step_mult: 1
   weight_decay: 0.0
   batch_size: 256
   target_update_polyak: 0.995
-  alpha_init: 1.0
+  alpha_init: 10
   adam_eps: 1.0e-8
 
 # network
@@ -79,7 +79,7 @@ hydra:
 
 # Settings for checkpointing
 checkpoint:
-  checkpoint_interval: 1
+  checkpoint_interval: 50
   load_from_checkpoint: False
   model_checkpoint_path: utils/checkpoint_test_sac   # Path to checkpoint, RELATIVE to Wind-RL/
   model_checkpoint_id: 1500  # ID of checkpoint
