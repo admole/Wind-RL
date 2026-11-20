@@ -1,0 +1,47 @@
+# environment and task
+env:
+  n_parallel: 32
+  n_processors_per_env: 128
+  dummy_update: False
+  env_name: WindFarm
+  turbines: 3
+  probes_per_turbine: 14
+  flow_field_directions: ['ux']  # we will use these components of the flow field for each probe
+  turbine_diameter: 126
+  turbine_height: 90
+  turbine_spacing: 5
+  turbine_spacing_z: 7
+  max_yaw_speed: 0.5
+  max_yaw_angle: 40
+  steps_per_frame: 50
+  reset_frames: 150
+  initial_reset_frames: 5000
+  frame_stack: 1  # Number of frames to be stacked as agent input
+  reward_average_steps: 1  # Number of frames over which to average the reward
+  penalty_scale: 0.5
+  penalty_exp: 26
+  velocity_penalty_scale: 0.0
+  difference_penalty_scale: 0.0
+  fluctuation_penalty_scale: 0.0
+  random_reset: False  # If True, at each reset angles will be chosen randomly
+  initial_angles: [0.0, 0.0, 0.0]
+
+optim:
+  mo_weight: 2.0
+  init_num_obs: 6
+  train_steps: 50
+  episode_steps: 500
+  beta: 2.0
+  reset_iterations: 1
+  debug: False
+
+# logging
+logger:
+  logging_stream: stdout  # stdout to print to console or empty (None) to print to standard log file
+
+# Configure hydra
+hydra:
+  run:
+    dir: outputs
+  output_subdir: hydra_logs
+

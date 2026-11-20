@@ -67,10 +67,53 @@ def make_parallel_env(cfg, params, num_envs, device="cpu", eval_only=False):
     env = ParallelEnv(num_envs, function_list)
     return env
 
+def rainflow_count(data):
+    """
+    Perform rainflow counting on a time series.
+    Calculates an array of cycle amplitudes.
+    Uses this to determine the damage equivalent load
+    """
+    # Extract turning points (peaks and valleys)
+    # print(data.shape)
+    cycles = []
+    # for series in data:
+    series = data
+    tp = [series[0]]
+    for i in range(1, len(series)-1):
+        if (series[i] - series[i-1]) * (series[i+1] - series[i]) < 0:
+            tp.append(series[i])
+    tp.append(series[-1])
+    tp = np.array(tp)
+
+    stack = []
+
+    for x in tp:
+        stack.append(x)
+        while len(stack) >= 3:
+            s0, s1, s2 = stack[-3:]
+            range1 = abs(s1 - s0)
+            range2 = abs(s2 - s1)
+            if range1 <= range2:
+                cycles.append(range1)
+                stack.pop(-2)  # remove middle element
+            else:
+                break
+
+    # Remaining half cycles
+    for i in range(len(stack) - 1):
+        cycles.append(abs(stack[i+1] - stack[i]) / 2)
+
+    m = 10
+
+    rain = np.array(cycles)
+    damage = np.sum((rain) ** m / len(rain)) ** (1/m)
+
+    return damage
+
 
 class BOTrainer:
     def __init__(self, env, n_initial_samples, episode_steps, burnin_steps, beta, reset_iterations,
-                 bound=40., save_directory_path=None):
+                 bound=40., save_directory_path=None, mo_weight=0.0):
         self.N_DIMS = env.action_spec.shape[-1]
         self.env = env
         # TO-DO: figure out the lower and upper bounds for all the angles!
@@ -85,6 +128,7 @@ class BOTrainer:
         self.n_initial_samples = n_initial_samples
         self.save_directory = save_directory_path
         self.reset_iterations = reset_iterations
+        self.mo_weight = mo_weight
         if save_directory_path is None:
             warnings.warn(f"save_directory_path parameter has not been specified. Results will not be saved.")
 
@@ -154,8 +198,10 @@ class BOTrainer:
         # Bayesian Optimization loop
         for i in range(optimisation_iterations):
             if i % self.reset_iterations == 0:
+                logging.info("Resetting environment...")
                 self.env.reset()
 
+            self.beta -= self.beta / optimisation_iterations
             train_x, train_y, info = self.train_one_step(train_x, train_y)
             if save and self.save_directory is not None:
                 self.save(self.save_directory, train_x, train_y, info, user_warnings=False)
@@ -189,10 +235,15 @@ class BOTrainer:
             observations.append(observation)
 
         # Discard the initial burn in steps
-        croppped_rewards = rewards[self.burnin_steps:]
+        cropped_rewards = rewards[self.burnin_steps:]
 
         # Extract mean (and an estimate of measurement noise?)
-        mean_reward = torch.tensor(np.mean(np.asarray(croppped_rewards)))
+        mean_reward = torch.tensor(np.mean(np.asarray(cropped_rewards)))
+        damage = torch.tensor(rainflow_count(np.asarray(cropped_rewards)))
+        # Think this damage should be computed per turbine then averaged
+        # rather than calculated from the wind farm power series (mean 12 up)
+
+        mean_reward -= self.mo_weight * damage
 
         # Store any desired extra information in an info dictionary
         info = {'rewards': rewards, 'observations': observations}
