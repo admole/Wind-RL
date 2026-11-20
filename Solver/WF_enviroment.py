@@ -80,6 +80,7 @@ class TurbEnv(EnvBase):
         self.reward_average_steps = params["reward_average_steps"]
         self.velocity_penalty_scale = params["velocity_penalty_scale"]
         self.difference_penalty_scale = params["difference_penalty_scale"]
+        self.fluctuation_penalty_scale = params["fluctuation_penalty_scale"]
 
         # Create client
         self.client = Client(address=None, cluster=False)
@@ -163,6 +164,7 @@ class TurbEnv(EnvBase):
         # Retrieve action and previous alpha from tensordict
         action = tensordict.get(self.env_action_key)
         alpha = tensordict.get(self.env_alpha_key)
+        old_power = tensordict.get(("next", "power"))
         u = action
         # u = u.clamp(-1., 1.)  # this should happen automatically
         u = u * self.max_speed  # since the actor outputs values between -1 and 1, correct scale here
@@ -178,13 +180,14 @@ class TurbEnv(EnvBase):
         angle_penalty = torch.mean(self.penalty_scale * (new_alpha.squeeze()/self.max_angle)**(self.penalty_exponent))
         velocity_penalty = self.velocity_penalty_scale * torch.mean((u / self.max_speed)**2)
         difference_penalty = self.difference_penalty_scale * torch.mean((power.flatten().unsqueeze(0) - power.flatten().unsqueeze(1))**2)
+        fluctuation_penalty = self.fluctuation_penalty_scale * torch.mean((power-old_power)**2)
 
         # power contains the individual turbine powers
         # take the mean over those to get the farm power (and keep scaling)
         power = torch.mean(power, axis=-1)
 
         # Compute instanteneous reward
-        reward = power - angle_penalty - velocity_penalty - difference_penalty
+        reward = power - angle_penalty - velocity_penalty - difference_penalty - fluctuation_penalty
 
         # reward now has the instanteneous reward
         # Next, we average the reward over a certain number of steps in the past

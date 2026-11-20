@@ -50,6 +50,7 @@ def main(cfg: "DictConfig"):
         "reward_average_steps": cfg.env.reward_average_steps,
         "velocity_penalty_scale": cfg.env.velocity_penalty_scale,
         "difference_penalty_scale": cfg.env.difference_penalty_scale,
+        "fluctuation_penalty_scale": cfg.env.fluctuation_penalty_scale,
     }
 
     logging.info('Creating models')
@@ -74,6 +75,7 @@ def main(cfg: "DictConfig"):
         beta=cfg.optim.beta,
         reset_iterations=cfg.optim.reset_iterations,
         save_directory_path=output_dir,
+        mo_weight=cfg.optim.mo_weight,
     )
     if trainer.save_directory:
         logging.info(f"Logging files to {output_dir}.")

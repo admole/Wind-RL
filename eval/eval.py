@@ -105,6 +105,7 @@ def main(cfg: "DictConfig"):
         "reward_average_steps": cfg.env.reward_average_steps,
         "velocity_penalty_scale": cfg.env.velocity_penalty_scale,
         "difference_penalty_scale": cfg.env.difference_penalty_scale,
+        "fluctuation_penalty_scale": cfg.env.fluctuation_penalty_scale,
     }
 
     # Create environments

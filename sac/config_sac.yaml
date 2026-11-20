@@ -23,6 +23,7 @@ env:
   penalty_exp: 26
   velocity_penalty_scale: 0.0
   difference_penalty_scale: 0.0
+  fluctuation_penalty_scale: 10
   random_reset: False  # If True, at each reset angles will be chosen randomly
   initial_angles: [0.0, 0.0, 0.0]
 

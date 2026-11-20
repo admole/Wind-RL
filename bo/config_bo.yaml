@@ -1,6 +1,6 @@
 # environment and task
 env:
-  n_parallel: 5
+  n_parallel: 32
   n_processors_per_env: 128
   dummy_update: False
   env_name: WindFarm
@@ -11,21 +11,23 @@ env:
   turbine_height: 90
   turbine_spacing: 5
   turbine_spacing_z: 7
-  max_yaw_speed: 0.4
+  max_yaw_speed: 0.5
   max_yaw_angle: 40
   steps_per_frame: 50
   reset_frames: 150
-  initial_reset_frames: 50  # for debugging
+  initial_reset_frames: 5000
   frame_stack: 1  # Number of frames to be stacked as agent input
   reward_average_steps: 1  # Number of frames over which to average the reward
   penalty_scale: 0.5
   penalty_exp: 26
   velocity_penalty_scale: 0.0
   difference_penalty_scale: 0.0
+  fluctuation_penalty_scale: 0.0
   random_reset: False  # If True, at each reset angles will be chosen randomly
   initial_angles: [0.0, 0.0, 0.0]
 
 optim:
+  mo_weight: 2.0
   init_num_obs: 6
   train_steps: 50
   episode_steps: 500
