@@ -36,8 +36,8 @@ def launch_database(experiment, port, dummy_update=False):
 
 
 def launch_solver(experiment, instance, cfg):
-    os.environ['LD_LIBRARY_PATH'] = "/work/e809/e809/amole-e809/Incompact3d-smartredis/Incompact3d/build/smartredis-build/smartredis/install/lib:" + os.environ.get('LD_LIBRARY_PATH', "")
-    os.environ['PATH'] = os.environ['PATH'] + ":/work/e809/e809/amole-e809/Incompact3d-smartredis/Incompact3d/build/bin"
+    os.environ['LD_LIBRARY_PATH'] = "/work/e01/e01/amole/Incompact3d-smartredis/Incompact3d/build/smartredis-build/smartredis/install/lib:" + os.environ.get('LD_LIBRARY_PATH', "")
+    os.environ['PATH'] = os.environ['PATH'] + ":/work/e01/e01/amole/Incompact3d-smartredis/Incompact3d/build/bin"
     # TODO: probably (definitely) want a better way to set these
 
     aprun = experiment.create_run_settings(exe="xcompact3d", run_command="srun")
@@ -109,6 +109,7 @@ def launch_eval(experiment, cfg, dummy_update=False):
     # scripts to execution location inside newly created dir
     # only necessary if its not an executable (python is executable here)
     file_list = ["./eval/eval.py"]
+    file_list += [f"./eval/optimum.npy"]
     if 'ppo' in cfg.eval.training_name.lower():
         algo = 'ppo'
     elif 'sac' in cfg.eval.training_name.lower():

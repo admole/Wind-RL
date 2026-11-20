@@ -33,8 +33,8 @@ def launch_database(experiment, port):
 
 
 def launch_solver(experiment, instance, cfg):
-    os.environ['LD_LIBRARY_PATH'] = "/work/e809/e809/amole-e809/Incompact3d-smartredis/Incompact3d/build/smartredis-build/smartredis/install/lib:" + os.environ.get('LD_LIBRARY_PATH', "")
-    os.environ['PATH'] = os.environ['PATH'] + ":/work/e809/e809/amole-e809/Incompact3d-smartredis/Incompact3d/build/bin"
+    os.environ['LD_LIBRARY_PATH'] = "/work/e01/e01/amole/Incompact3d-smartredis/Incompact3d/build/smartredis-build/smartredis/install/lib:" + os.environ.get('LD_LIBRARY_PATH', "")
+    os.environ['PATH'] = os.environ['PATH'] + ":/work/e01/e01/amole/Incompact3d-smartredis/Incompact3d/build/bin"
     # TODO: probably (definitely) want a better way to set these
 
     aprun = experiment.create_run_settings(exe="xcompact3d", run_command="srun")
@@ -110,15 +110,15 @@ if __name__ == '__main__':
     # Set up experiment
     exp = Experiment(run_name, launcher="auto")
 
-    # Runtime parameters
-    n_environments = cfg.env.n_parallel
-
     # Start database
     db_port = 6783
     db = launch_database(exp, db_port)
 
     # Start RL
     rl_app = launch_sac(exp, cfg, config_modifiers)
+
+    # Runtime parameters
+    n_environments = cfg.env.n_parallel
 
     # Start simulations
     simulations = []
